@@ -19,7 +19,7 @@ The tests cover:
 Implemented in:
 - `Bash` (pure shell-based logic)
 - `Python` (via `unittest` + `subprocess`)
-
+- `Java` (via `JUnit 5` + `subprocess`)
 ---
 
 ## 📁 Files
@@ -28,6 +28,7 @@ Implemented in:
 |---------------|------------------------------------------|
 | `test.sh`     | Bash script that runs arithmetic tests   |
 | `test_bc.py`  | Python script using `unittest` framework |
+| `BcTest.java` | Java test using `JUnit 5` framework     |
 
 ---
 
@@ -36,6 +37,7 @@ Implemented in:
 ### 🔹 1. Bash Version
 
 ```bash
+   cd bash
    chmod +x test.sh
    ./test.sh 
 ```
@@ -44,5 +46,13 @@ Implemented in:
 ### 🔹 2. Python Version
 
 ```bash
+   cd python
    python3 test_bc.py
    ```
+
+### 🔹 3. Java Version
+
+```bash
+   cd java
+   mvn test
+  ```
