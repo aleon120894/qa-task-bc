@@ -1,71 +1,85 @@
-import java.io.BufferedWriter;
-import java.io.OutputStreamWriter;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.IOException;
-
+import java.io.*;
+import java.util.*;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class BcTest {
 
-    String runBc(String expression) throws IOException, InterruptedException {
-        ProcessBuilder pb = new ProcessBuilder("bc", "-l");  // Add the -l option here
-        pb.redirectErrorStream(true); // Merge stderr into stdout
+    static class BcResult {
+        String stdout;
+        String stderr;
+
+        BcResult(String stdout, String stderr) {
+            this.stdout = stdout;
+            this.stderr = stderr;
+        }
+    }
+
+    BcResult runBc(String expression) throws IOException, InterruptedException {
+        ProcessBuilder pb = new ProcessBuilder("bc", "-l");
         Process process = pb.start();
 
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
-             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-
+        try (
+                BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
+                BufferedReader stdoutReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                BufferedReader stderrReader = new BufferedReader(new InputStreamReader(process.getErrorStream()))
+        ) {
             writer.write(expression);
             writer.newLine();
             writer.flush();
-            process.getOutputStream().close();
+            writer.close();
 
-            String output = reader.readLine();
-            int exitCode = process.waitFor();
+            String stdout = stdoutReader.readLine();
+            String stderr = stderrReader.readLine();
 
-            if (exitCode != 0 || output == null || output.contains("error") || output.isEmpty()) {
-                throw new RuntimeException("bc failed or returned error output");
-            }
-
-            return output;
+            process.waitFor();
+            return new BcResult(stdout, stderr);
         }
     }
 
     @Test
-    void testAddition() throws IOException, InterruptedException {
-        assertEquals(3.0, Double.parseDouble(runBc("1 + 2")), 0.0001);
+    void testValidExpression() throws Exception {
+        BcResult result = runBc("4 + 2 * 3");
+        assertEquals("10", result.stdout);
+        assertNull(result.stderr, "Expected no error, but got: " + result.stderr);
     }
 
     @Test
-    void testSubtraction() throws IOException, InterruptedException {
-        assertEquals(2.0, Double.parseDouble(runBc("5 - 3")), 0.0001);
+    void testSyntaxError() throws Exception {
+        BcResult result = runBc(" *924328793497843");
+        assertNull(result.stdout);
+        assertNotNull(result.stderr);
+        assertTrue(result.stderr.contains("syntax error"));
     }
 
     @Test
-    void testMultiplication() throws IOException, InterruptedException {
-        assertEquals(24.0, Double.parseDouble(runBc("4 * 6")), 0.0001);
+    void testDivideByZero() throws Exception {
+        BcResult result = runBc("1/0");
+        assertNull(result.stdout);
+        assertNotNull(result.stderr);
+        assertTrue(result.stderr.toLowerCase().contains("divide by zero"));
     }
 
     @Test
-    void testDivision() throws IOException, InterruptedException {
-        assertEquals(2.5, Double.parseDouble(runBc("10 / 4")), 0.0001);
+    void testNegativeScaleWarning() throws Exception {
+        BcResult result = runBc("scale=-4; -0.4");
+        assertEquals("-.4", result.stdout);
+        assertNotNull(result.stderr);
+        assertTrue(result.stderr.toLowerCase().contains("negative scale"));
     }
 
     @Test
-    void testLargeNumbers() throws IOException, InterruptedException {
-        assertEquals(99999999980000000001.0, Double.parseDouble(runBc("9999999999 * 9999999999")), 1.0);
+    void testHexError() throws Exception {
+        BcResult result = runBc("0x13");
+        assertNull(result.stdout);
+        assertNotNull(result.stderr);
+        assertTrue(result.stderr.toLowerCase().contains("syntax error"));
     }
 
     @Test
-    void testDivisionByZero() {
-        assertThrows(RuntimeException.class, () -> {
-            try {
-                runBc("1 / 0");
-            } catch (IOException | InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        });
+    void testFloatingPointOutput() throws Exception {
+        BcResult result = runBc("scale=2; 5.0/-3");
+        assertEquals("-1.66", result.stdout);
+        assertNull(result.stderr);
     }
 }
